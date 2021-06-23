@@ -2,23 +2,33 @@
 #include <stdlib.h>
 #include <time.h> // for random
 #include <string.h>
+#include <stdbool.h>
+#include <termios.h>
+#include <unistd.h>
+#include <signal.h>
+#include <stdint.h>
 
 #define SIZE 5
 
 // Functions
 void menu();
 void game();
+void saveScore(char);
+void ranking(); 
 
 // Game Functions
 void drawBoard();
 void generateNum();
+void rotateBoard();
+void moveLeft();
+void moveRight();
+void moveUp();
+void moveDown();
 
+void signal_callback_handler(int signum); // register signal handler for when ctrl-c is pressed
+void setBufferedInput(bool enable); // Get the key value without pressing Enter
 int checkLose();
 int checkWin();
-
-// Ranking function
-void saveScore(char);
-void ranking(); 
 
 // Variables
 int board[SIZE][SIZE];
@@ -38,44 +48,10 @@ typedef struct user {
 } USER;
 
 
+
 int main(void) {
     srand(time(0));
-
-    
-    
-    generateNum();
-    generateNum();
-    drawBoard();
-
-    // while(1) {
-    //     if (checkWin()) {
-    //         printf("\n\t\t\tCongratulations, you've got 2048 in %d moves.", moves);
-    //         printf("\n\t\t\tPoints: %d || Time: %d", scores, timeTaken);
-    //         saveScore('y');
-    //         break;
-    //     }
-
-    //     if (checkLose()) {
-    //         printf("\n\t\t\tGame over.");
-    //         printf("\n\t\tPoints: %d || Time: %d || Combos: %d", scores, timeTaken, combo);
-    //         saveScore('n');
-    //         break;
-    //     }
-
-    //     scanf(" %c", &mov);
-    //     switch (mov)
-    //     {
-    //     case 'w':
-    //         /* code */
-    //         break;
-        
-    //     default:
-    //         break;
-    //     }
-
-        
-    // }
-
+    menu();
     return 0;
 }
 
@@ -87,10 +63,19 @@ void menu() {
     while (opt < 5 && opt > 0) {
         if (opt == 1) {
             game();
+            printf("Choose one option to proceed:\n1. Game Start\n2. How to play 2048\n3. Ranking\n4. Exit\n");
+            scanf("%d", &opt);
         } else if (opt == 2) {
             printf("\nYou just need to move the titles (a: left, s: down, d: right, w: up) and every time you move one, another tile pops up in a random manner anywhere in the box. When two tiles with the same number on them collide with one another as you move the them, they will merge into one tile with the sum of the numbers written on them initially. If you want to quit 2048, just simply press q.\n");
+            printf("Choose one option to proceed:\n1. Game Start\n2. How to play 2048\n3. Ranking\n4. Exit\n");
+            scanf("%d", &opt);
+
         } else if (opt == 3) {
             ranking();
+            printf("Choose one option to proceed:\n1. Game Start\n2. How to play 2048\n3. Ranking\n4. Exit\n");
+            scanf("%d", &opt);
+        } else if (opt == 4) {
+            return;
         }
         if (opt > 4 || opt < 0) {
             printf("Please choose a different option.\n");
@@ -98,6 +83,57 @@ void menu() {
         }
     }
 
+}
+
+void game() {
+    printf("\033[?25l\033[2J");
+    signal(SIGINT, signal_callback_handler);
+
+    char mov;
+
+    generateNum();
+    generateNum();
+    drawBoard();
+    setBufferedInput(false);
+
+    printf("w, a, s, d to play the game and q to quit.\n");
+
+    while(1) {
+        if (checkWin()) {
+            printf("\n\t\t\tCongratulations, you've got 2048 in %d moves.", moves);
+            printf("\n\t\t\tPoints: %d || Time: %d", scores, timeTaken);
+            saveScore('y');
+            break;
+        }
+
+        if (checkLose()) {
+            printf("\n\t\t\tGame over.");
+            printf("\n\t\tPoints: %d || Time: %d || Combos: %d", scores, timeTaken, combo);
+            saveScore('n');
+            break;
+        }
+
+        scanf("%s", &mov);
+        if (mov == 'w') {
+            moveUp();
+        } if (mov == 'a') {
+            moveLeft();
+        } if (mov == 's') {
+            moveDown();
+        } if (mov == 'd') {
+            moveRight();
+        } if (mov == 'q') {
+            char opt;
+            printf("QUIT THE GAME? y or n\n");
+            scanf("%s", &opt);
+            if (opt == 'y') break;
+        }
+        printf("\033[2J\033[H" ); // Clear the screen
+        printf("w, a, s, d to play the game and q to quit.\n");
+        
+    }
+    setBufferedInput(true);
+    printf("\033[?25h\033[m");
 }
 
 void drawBoard() {
@@ -110,23 +146,52 @@ void drawBoard() {
         }
         printf("\n──────────────────────────\n");
     }
+    printf("\n");
 }
 
 void generateNum() {
-    int horLoc = rand() % SIZE;
-    int verLoc = rand() % SIZE;
-    //printf("%d %d", horLoc, verLoc);
-    int randNumArr[2] = {2,4};
+    srand(time(NULL));
 
-    if (board[horLoc][verLoc] == 0) {
-        int num = rand() % 2;
-        (num == 0) ? (board[horLoc][verLoc] = 2) : (board[horLoc][verLoc] = 4);
+    int empty[SIZE*SIZE][2];
+    int count = 0;
+
+    for (int i=0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            if (board[i][j] == 0) {
+                empty[count][0] = i;
+                empty[count][1] = j;
+                count++;
+            }
+        }
     }
 
-
-    //printf("%d", board[horLoc][verLoc]);
+    int row, col, val;
+    if (rand() % 2) val = 2; else val = 4;
+    if (count > 0) {
+        int temp = rand() % count;
+        row = empty[temp][0];
+        col = empty[temp][1];
+        board[row][col] = val;
+    }
 }
 
+// ideas from https://www.geeksforgeeks.org/inplace-rotate-square-matrix-by-90-degrees/
+void rotateBoard() {
+    int temp;
+    for (int i=0; i < SIZE/2; i++) {
+        for (int j=i; j < SIZE - i - 1; j++) {
+            temp = board[i][j];
+            board[i][j] = board[j][SIZE - 1 - i]; // move values from right to top
+            board[j][SIZE-1-i] = board[SIZE-1-i][SIZE-1-j]; // move values from bottom to right
+            board[SIZE-1-i][SIZE-1-j] = board[SIZE-1-j][i]; // move values from left to bottom
+            board[SIZE-1-j][i] = temp; // assign temp to left
+        }
+    }
+}
+
+void moveDown() {
+
+}
 
 int checkLose() {
     int check = 1;
@@ -163,6 +228,37 @@ int checkWin() {
         }
     }
     return win;
+}
+
+void setBufferedInput(bool enable) {
+    static bool enabled = true;
+    static struct termios old;
+    struct termios new;
+
+    if (enable && !enabled) {
+        // restore the former settings
+        tcsetattr(STDIN_FILENO,TCSANOW,&old);
+        // set the new state
+        enabled = true;
+    } else if (!enable && enabled) {
+        // get the terminal settings for standard input
+        tcgetattr(STDIN_FILENO,&new);
+        // keep the old setting to restore them at the end
+        old = new;
+        // disable canonical mode (buffered i/o) and local echo
+        new.c_lflag &=(~ICANON & ~ECHO);
+        // set the new settings immediately
+        tcsetattr(STDIN_FILENO,TCSANOW,&new);
+        // set the new state
+        enabled = false;
+    }
+}
+
+void signal_callback_handler(int signum) {
+    printf("         TERMINATED         \n");
+    setBufferedInput(true);
+	printf("\033[?25h\033[m");
+	exit(signum);
 }
 
 // Save the score to a TXT file
@@ -226,7 +322,7 @@ void ranking() {
     int combos;
 
     while (fscanf(fp, "%s %s %d %d %d %d", username, success, &(scores), &(moves), &(timeTaken), &(combos)) == 6) {
-        printf("%s\t%s\t%d\t%d\t%d\t%d\n", username, success, scores, moves, timeTaken, combos);
+        //printf("%s\t%s\t%d\t%d\t%d\t%d\n", username, success, scores, moves, timeTaken, combos);
         strncpy(userList[idx].username, username, 100); 
         userList[idx].username[99] = '\0';
         strncpy(userList[idx].success, success, 3); 
@@ -242,9 +338,10 @@ void ranking() {
     fclose(fp);
 
     qsort(userList, num, sizeof(USER), compare);
+    printf("\n");
     
     for (int i=0; i < num; i++) {
-        printf("%s\t%d\n", userList[i].username, userList[i].scores);
+        printf("Username: %s\t Scores: %d\t Time: %d\n", userList[i].username, userList[i].scores, userList[i].timeTaken);
     }
 
 }
