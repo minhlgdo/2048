@@ -66,10 +66,11 @@ void menu() {
     printf("Choose one option to proceed:\n1. Game Start\n2. How to play 2048\n3. Ranking\n4. Exit\n");
     scanf("%d", &opt);
 
-    while (opt < 5 && opt > 0) {
+    while (1) {
         if (opt == 1) {
             game();
             printf("\nChoose one option to proceed:\n1. Game Start\n2. How to play 2048\n3. Ranking\n4. Exit\n");
+            printf("\n");
             scanf("%d", &opt);
         } else if (opt == 2) {
             printf("\nYou just need to move the titles (a: left, s: down, d: right, w: up) and every time you move one, another tile pops up in a random manner anywhere in the box. When two tiles with the same number on them collide with one another as you move the them, they will merge into one tile with the sum of the numbers written on them initially. If you want to quit 2048, just simply press q.\n");
@@ -83,7 +84,7 @@ void menu() {
         } else if (opt == 4) {
             return;
         }
-        if (opt > 4 || opt < 0) {
+        if (opt > 4 || opt < 1) {
             printf("Please choose a different option.\n");
             scanf("%d", &opt);
         }
@@ -94,7 +95,7 @@ void menu() {
 void game() {
     time_t breakTime;
     time_t startTime = time(NULL);
-    time_t seconds = 30;
+    time_t seconds = 300; // 5 minutes 
     breakTime = startTime + seconds;
 
     printf("\033[?25l\033[2J");
@@ -102,7 +103,7 @@ void game() {
 
     char mov;
     printf("Scores: %d %*s%d\n", scores, 20, "Moves: ", moves);
-    printf("\t\tTime left: %ld seconds\n", breakTime - startTime);
+    printf("Time left: %ld seconds\n\n", breakTime - startTime);
 
     generateNum();
     generateNum();
@@ -114,9 +115,10 @@ void game() {
     int check = 0; 
     int in_loop = 0;
 
-    while(startTime < breakTime) {
-        startTime = time(NULL);
+    while(time(NULL) < breakTime) {
+        //startTime = time(NULL);
         check = record(!in_loop);
+        if (check) break;
 
         mov = getchar();
         if (mov == 'w') {
@@ -135,12 +137,13 @@ void game() {
             if (opt == 'y') {
                 break;
             }
+            setBufferedInput(false);
         }
         //clock_t betweenTime = clock();
 
         printf("\033[2J\033[H" ); // Clear the screen
         printf("Scores: %d %*s%d\n", scores, 20, "Moves: ", moves);
-        printf("\t\tTime left: %ld seconds", breakTime - startTime); // Update time after updating the board
+        printf("Time left: %ld seconds\n", breakTime - time(NULL)); // Update time after updating the board
         printf("\n");
         drawBoard();
         printf("w, a, s, d to play the game and q to quit.\n");
@@ -157,32 +160,41 @@ void game() {
 int record(int in_loop) {
     int rec = 0;
     if (win()) {
-            printf("\n\t\t\tCongratulations, you've got 2048 in %d moves.", moves);
-            printf("\n\t\t\tPoints: %d || Combos: %d", scores, combos);
+            printf("\nCongratulations, you've got 2048 in %d moves.", moves);
+            printf("\nPoints: %d || Combos: %d", scores, combos);
             setBufferedInput(true);
             saveScore('y');
             rec = 1;
+            return rec;
     }
 
-    else if (lose() || !in_loop) {
-        printf("\n\t\t\tGame over.");
-        printf("\n\t\tPoints: %d || Combos: %d", scores, combos);
+    else if (lose()) {
+        printf("\n\tGame over.");
+        printf("\nPoints: %d || Combos: %d", scores, combos);
         setBufferedInput(true);
         saveScore('n');
         rec = 1;
+        return rec;
+    } else if (!in_loop) {
+        printf("\n\tGame over.");
+        printf("\nPoints: %d || Combos: %d", scores, combos);
+        setBufferedInput(true);
+        saveScore('n');
+        rec = 1;
+        return rec;
     }
     return rec;
 }
 
 void drawBoard() {
-    printf("──────────────────────────\n");
+    printf("───────────────────────────────\n");
 
     for (int i=0; i < SIZE; i++) {
         for(int j=0; j < SIZE; j++) {
             if (j == 0) printf("|");
-            printf(" %d  |", board[i][j]);
+            printf("%*d|", 5, board[i][j]);
         }
-        printf("\n──────────────────────────\n");
+        printf("\n───────────────────────────────\n");
     }
     printf("\n");
 }
@@ -213,7 +225,6 @@ void generateNum() {
     }
 }
 
-// ideas from https://www.geeksforgeeks.org/inplace-rotate-square-matrix-by-90-degrees/
 void rotateBoard() {
     int temp;
     for (int i=0; i < SIZE/2; i++) {
@@ -269,7 +280,7 @@ void moveUp() {
     rotateBoard();
     if(moveBoard()){
         generateNum();
-        generateNum();
+        // generateNum();
     }  
     rotateBoard();
 }
@@ -278,7 +289,7 @@ void moveDown() {
     rotateBoard();
     if(moveBoard()){
         generateNum();
-        generateNum();
+        //generateNum();
     }
     rotateBoard();
     rotateBoard();
@@ -290,7 +301,6 @@ void moveLeft() {
     rotateBoard();
     if (moveBoard()) {
         generateNum();
-        generateNum();
     }
     rotateBoard();
     rotateBoard();
@@ -299,7 +309,7 @@ void moveLeft() {
 void moveRight() {
     if (moveBoard()){
         generateNum();
-        generateNum();
+        //generateNum();
     }
 }
 
@@ -311,6 +321,7 @@ void reset() {
     }
     scores = 0;
     moves = 0;
+    combos = 0;
 }
 
 int lose() {
@@ -394,7 +405,7 @@ void saveScore(char success) {
 }
 
 // Sorted ranking: YES (moves -> time taken -> combo -> name) > NO (moves > (same moves -> combos -> time taken -> name))
-/* Reading the file, sorting, return 10 first users with their # of moves, time taken and combos
+/* Reading the file, sorting, return users with their # of moves, time taken and combos
 */
 
 int compare(const void *s1, const void *s2) {
@@ -407,7 +418,7 @@ int compare(const void *s1, const void *s2) {
             if (e1->moves == e2-> moves) {
                 int nameRanking = strcmp(e1->username, e2->username);
                 return nameRanking;
-            } return -(e1->moves - e2->moves);
+            } return (e1->moves - e2->moves);
         } return -(e1->scores - e2->scores);  
     } 
     return -winornot;
@@ -427,7 +438,7 @@ void ranking() {
             //printf("%s\t%s\t%d\t%d\t%d\t%d\n", data.username, data.success, data.scores, data.moves, data.timeTaken, data.combos);
         num++;
     }
-    printf("%d", num);
+    //printf("%d", num);
     USER userList[num]; int idx = 0;
     fseek(fp, 0, SEEK_SET); // setting the file pointer to point to the beginning of the file
 
@@ -457,7 +468,7 @@ void ranking() {
     printf("\n");
         
     for (int i=0; i < num; i++) {
-        printf("Username: %s\t Scores: %d\t Moves: %d\n", userList[i].username, userList[i].scores, userList[i].moves);
+        printf("Username: %-7s\tScores: %5d\tMoves: %d\n", userList[i].username, userList[i].scores, userList[i].moves);
     }
     
 }
